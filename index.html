@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'">
+  <title>RAW Converter</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ── Setup Overlay ── -->
+<div class="overlay hidden" id="overlay">
+  <div class="overlay-card">
+    <div class="ov-icon-wrap" id="ovIcon"></div>
+    <div class="ov-title">Setup Required</div>
+    <div class="ov-sub">
+      <strong>dnglab</strong> was not found. It handles RAW&nbsp;→&nbsp;DNG conversion.
+      Download it and point this app to the binary.
+    </div>
+    <div class="ov-note">
+      Download <strong>dnglab.exe</strong> from the
+      <span class="ov-link" id="ghLink">dnglab GitHub releases</span>,
+      then place it in the <code>bin\</code> folder next to this app,
+      or browse to its location below.
+    </div>
+    <div class="ov-row">
+      <input class="path-input" id="ovPathInput" type="text" placeholder="C:\tools\dnglab.exe">
+      <button class="btn btn-ghost btn-sm" id="ovBrowseBtn">Browse…</button>
+    </div>
+    <div class="ov-actions">
+      <button class="btn btn-primary" id="ovSaveBtn">Save &amp; Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Titlebar ── -->
+<div class="titlebar" id="titlebar">
+  <!-- macOS: left traffic-light controls (hidden on Windows) -->
+  <div class="wc-group wc-mac" id="wcMac">
+    <button class="wc wc-close" id="btnClose"  title="Close"></button>
+    <button class="wc wc-min"   id="btnMin"    title="Minimise"></button>
+    <button class="wc wc-max"   id="btnMax"    title="Maximise"></button>
+  </div>
+
+  <div class="titlebar-title">
+    <span id="titleIcon"></span>
+    RAW Converter
+  </div>
+
+  <div class="titlebar-end">
+    <button class="theme-btn" id="themeBtn" title="Toggle theme"></button>
+    <div class="ver-chip" id="verChip">dnglab</div>
+    <div class="update-chip hidden" id="updateChip" title=""><span id="updateChipText"></span></div>
+
+    <!-- Windows: right-side controls (hidden on macOS) -->
+    <div class="wc-group wc-win" id="wcWin">
+      <button class="wc wc-min"   id="btnMinW"   title="Minimise"></button>
+      <button class="wc wc-max"   id="btnMaxW"   title="Maximise"></button>
+      <button class="wc wc-close" id="btnCloseW" title="Close"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main ── -->
+<div class="content">
+
+  <!-- Drop zone -->
+  <div class="drop-zone" id="dropZone">
+    <div class="drop-icon-wrap" id="dropIcon"></div>
+    <div class="drop-title">Drop images or folders here</div>
+    <div class="drop-sub">RAW · DNG · HEIC · PNG · TIFF · AVIF · WebP and more</div>
+    <div class="drop-btns">
+      <button class="btn btn-ghost btn-sm" id="addFilesBtn">
+        <span id="icoFilePlus"></span> Add Files
+      </button>
+      <button class="btn btn-ghost btn-sm" id="addFolderBtn">
+        <span id="icoFolderPlus"></span> Add Folder
+      </button>
+    </div>
+  </div>
+
+  <!-- File list -->
+  <div class="files-section">
+    <div class="sec-header">
+      <span class="sec-label">Files</span>
+      <span class="badge" id="fileBadge">0</span>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm icon-btn" id="retryBtn" style="display:none" title="Retry failed">
+        <span id="icoRetry"></span> Retry
+      </button>
+      <button class="btn btn-ghost btn-sm icon-btn" id="clearBtn" style="display:none" title="Clear all">
+        <span id="icoTrash"></span> Clear
+      </button>
+    </div>
+    <div class="files-list" id="fileList">
+      <div class="empty" id="emptyState">
+        <span id="emptyIcon"></span>
+        <span>No files added — drop images above</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings: output + format -->
+  <div class="settings">
+
+    <div class="settings-row">
+      <div class="settings-title">Output</div>
+      <div class="radio-group">
+        <label class="radio-row">
+          <input type="radio" name="out" value="same" id="radioSame" checked>
+          <div class="radio-ring"><div class="radio-dot"></div></div>
+          <span class="radio-label">Same folder as source</span>
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="out" value="custom" id="radioCustom">
+          <div class="radio-ring"><div class="radio-dot"></div></div>
+          <span class="radio-label">Custom folder</span>
+        </label>
+      </div>
+      <div class="custom-row" id="customRow" style="display:none">
+        <input class="path-input" id="outPathInput" type="text"
+               placeholder="Select output folder…" readonly>
+        <button class="btn btn-ghost btn-sm" id="browseOutBtn">Browse…</button>
+      </div>
+    </div>
+
+    <div class="settings-divider"></div>
+
+    <div class="settings-row">
+      <div class="settings-title">Format</div>
+      <div class="fmt-tabs" id="fmtTabs">
+        <button class="fmt-btn active" data-fmt="dng">DNG</button>
+        <button class="fmt-btn"        data-fmt="jpg">JPEG</button>
+        <button class="fmt-btn"        data-fmt="png">PNG</button>
+      </div>
+      <div class="quality-row" id="qualityRow" style="display:none">
+        <span class="quality-label">Quality</span>
+        <input type="range" id="qualitySlider" min="60" max="100" value="90">
+        <span class="quality-val" id="qualityVal">90</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom bar -->
+  <div class="bottom-bar">
+    <span class="status-line" id="statusLine"></span>
+    <div class="progress-wrap" id="progWrap">
+      <div class="progress-fill" id="progFill"></div>
+    </div>
+    <button class="btn btn-ghost btn-sm icon-btn" id="pauseBtn" style="display:none">
+      <span id="icoPause"></span>
+      <span id="pauseLabel">Pause</span>
+    </button>
+    <button class="btn btn-stop icon-btn" id="stopBtn" style="display:none">
+      <span id="icoStop"></span> Stop
+    </button>
+    <button class="btn btn-primary icon-btn" id="convertBtn" disabled>
+      Convert <span id="pendingCount">0</span> files
+      <span id="icoArrow"></span>
+    </button>
+  </div>
+
+</div>
+
+<script src="renderer.js"></script>
+</body>
+</html>

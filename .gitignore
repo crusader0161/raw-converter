@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Platform binaries – download from github.com/dnglab/dnglab/releases
+bin/
+
+# System
+.DS_Store
+Thumbs.db
+*.log

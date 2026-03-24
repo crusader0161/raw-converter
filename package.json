@@ -1,0 +1,97 @@
+{
+  "name": "raw-converter",
+  "version": "1.0.0",
+  "description": "RAW to DNG/JPEG/PNG converter powered by dnglab",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "icons": "node scripts/build-icons.js",
+    "build": "npm run icons && electron-builder",
+    "build:win": "npm run icons && electron-builder --win",
+    "build:mac": "npm run icons && electron-builder --mac",
+    "build:linux": "npm run icons && electron-builder --linux"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "electron-updater": "^6.8.3",
+    "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3",
+    "png-to-ico": "^2.1.8"
+  },
+  "build": {
+    "appId": "com.rawconverter.app",
+    "productName": "RAW Converter",
+    "icon": "assets/icon",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "styles.css",
+      "renderer.js"
+    ],
+    "extraResources": [
+      {
+        "from": "bin/",
+        "to": "bin/",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
+    },
+    "mac": {
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.photography",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ]
+    },
+    "linux": {
+      "icon": "assets/icon.png",
+      "category": "Graphics",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "RAW Converter"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "crusader0161",
+      "repo": "raw-converter"
+    }
+  }
+}
