@@ -1,53 +1,74 @@
 ; ── RAW Converter custom NSIS installer script ───────────────────────────────
-; Registers the PSD/PSB thumbnail handler DLL during install,
-; and unregisters it during uninstall.
-;
-; Included via package.json nsis.include
+; Registers the PSD/PSB thumbnail handler DLL during install.
+; Installs the QuickLook plugin if QuickLook is present.
+; Unregisters both on uninstall.
 
 !macro customInstall
-  ; ── Register PSD/PSB thumbnail handler ──────────────────────────────────────
+  ; ── 1. Register PSD/PSB Explorer thumbnail handler ──────────────────────────
   DetailPrint "Registering PSD/PSB thumbnail handler..."
-
-  ; DLL is in resources/thumbnail-handler/ relative to the install dir
   StrCpy $0 "$INSTDIR\resources\thumbnail-handler\RawConverterThumb.dll"
 
-  ; Check it exists (it should, we included it in extraResources)
-  IfFileExists "$0" regOk regSkip
-
-  regOk:
-    ; Use the 64-bit RegAsm from .NET Framework 4.x
+  IfFileExists "$0" thumb_reg_ok thumb_reg_skip
+  thumb_reg_ok:
     ExecWait '"$WINDIR\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe" /codebase "$0"' $1
-    IntCmp $1 0 regDone regWarn regWarn
-    regWarn:
-      MessageBox MB_OK|MB_ICONINFORMATION \
-        "PSD/PSB thumbnail registration returned code $1.$\n\
-         This is non-fatal — the app works fine.$\n\
-         To enable Explorer thumbnails manually, run thumbnail-handler\build.bat as Administrator."
-    regDone:
-      ; Restart shell so thumbnails take effect immediately
-      System::Call "shell32::SHChangeNotify(i 0x8000000, i 0, p 0, p 0)"
-    Goto regEnd
+    ; Notify shell to refresh thumbnails
+    System::Call "shell32::SHChangeNotify(i 0x8000000, i 0, p 0, p 0)"
+    Goto thumb_reg_end
+  thumb_reg_skip:
+    DetailPrint "Thumbnail handler DLL not found, skipping."
+  thumb_reg_end:
 
-  regSkip:
-    DetailPrint "Thumbnail handler DLL not found, skipping registration."
+  ; ── 2. Install QuickLook plugin if QuickLook is present ─────────────────────
+  DetailPrint "Checking for QuickLook..."
+  StrCpy $R0 ""
 
-  regEnd:
+  ; Search common QuickLook install locations
+  IfFileExists "$LOCALAPPDATA\Programs\QuickLook\QuickLook.Common.dll" 0 +2
+    StrCpy $R0 "$LOCALAPPDATA\Programs\QuickLook"
+  StrCmp $R0 "" 0 ql_found
+  IfFileExists "$PROGRAMFILES\QuickLook\QuickLook.Common.dll" 0 +2
+    StrCpy $R0 "$PROGRAMFILES\QuickLook"
+  StrCmp $R0 "" 0 ql_found
+  IfFileExists "$PROGRAMFILES64\QuickLook\QuickLook.Common.dll" 0 +2
+    StrCpy $R0 "$PROGRAMFILES64\QuickLook"
+  StrCmp $R0 "" ql_not_found ql_found
+
+  ql_found:
+    DetailPrint "QuickLook found at $R0 — installing Space-preview plugin..."
+    StrCpy $R1 "$APPDATA\QuickLook\Plugins\RawConverter"
+    CreateDirectory "$R1"
+    StrCpy $R2 "$INSTDIR\resources\quicklook-plugin\RawConverterQLPlugin.dll"
+    IfFileExists "$R2" 0 ql_no_plugin
+      CopyFiles /SILENT "$R2" "$R1\RawConverterQLPlugin.dll"
+      DetailPrint "QuickLook plugin installed. Press Space on RAW/PSD files in Explorer!"
+      Goto ql_done
+    ql_no_plugin:
+      DetailPrint "QuickLook plugin DLL not found in resources, skipping."
+    Goto ql_done
+
+  ql_not_found:
+    DetailPrint "QuickLook not found — Space-preview plugin not installed."
+    DetailPrint "Install QuickLook from the Microsoft Store for Space-bar previews."
+
+  ql_done:
 !macroend
 
 !macro customUnInstall
-  ; ── Unregister PSD/PSB thumbnail handler ────────────────────────────────────
+  ; ── Unregister thumbnail handler ────────────────────────────────────────────
   DetailPrint "Unregistering PSD/PSB thumbnail handler..."
-
   StrCpy $0 "$INSTDIR\resources\thumbnail-handler\RawConverterThumb.dll"
-  IfFileExists "$0" unregOk unregSkip
-
-  unregOk:
+  IfFileExists "$0" thumb_unreg_ok thumb_unreg_skip
+  thumb_unreg_ok:
     ExecWait '"$WINDIR\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe" /unregister "$0"' $1
     System::Call "shell32::SHChangeNotify(i 0x8000000, i 0, p 0, p 0)"
-    Goto unregEnd
+    Goto thumb_unreg_end
+  thumb_unreg_skip:
+    DetailPrint "Thumbnail DLL not found, skipping unregistration."
+  thumb_unreg_end:
 
-  unregSkip:
-    DetailPrint "Thumbnail handler DLL not found, skipping unregistration."
-
-  unregEnd:
+  ; ── Remove QuickLook plugin ──────────────────────────────────────────────────
+  StrCpy $R1 "$APPDATA\QuickLook\Plugins\RawConverter"
+  IfFileExists "$R1\RawConverterQLPlugin.dll" 0 +3
+    Delete "$R1\RawConverterQLPlugin.dll"
+    RMDir  "$R1"
 !macroend

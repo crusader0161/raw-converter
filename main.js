@@ -490,6 +490,49 @@ ipcMain.on('cancel-conversion', () => {
   if (activeProcess) { activeProcess.kill(); activeProcess = null }
 })
 
+// ── QuickLook integration ─────────────────────────────────────────────────────
+function findQuickLookDir() {
+  const candidates = [
+    path.join(process.env.LOCALAPPDATA || '', 'Programs', 'QuickLook'),
+    path.join(process.env.PROGRAMFILES || '', 'QuickLook'),
+    'C:\\Program Files\\QuickLook',
+  ]
+  return candidates.find(p => {
+    try { return fs.existsSync(path.join(p, 'QuickLook.Common.dll')) } catch { return false }
+  }) || null
+}
+
+ipcMain.handle('check-quicklook', async () => {
+  if (process.platform !== 'win32') return { installed: false }
+  const qlDir     = findQuickLookDir()
+  const pluginDir = path.join(process.env.APPDATA || '', 'QuickLook', 'Plugins', 'RawConverter')
+  const pluginDll = path.join(pluginDir, 'RawConverterQLPlugin.dll')
+  return {
+    installed:     !!qlDir,
+    qlDir,
+    pluginInstalled: fs.existsSync(pluginDll),
+  }
+})
+
+ipcMain.handle('install-quicklook-plugin', async () => {
+  if (process.platform !== 'win32') return { ok: false, error: 'Windows only' }
+  const qlDir = findQuickLookDir()
+  if (!qlDir) return { ok: false, error: 'QuickLook not found' }
+
+  const srcDll = app.isPackaged
+    ? path.join(process.resourcesPath, 'quicklook-plugin', 'RawConverterQLPlugin.dll')
+    : path.join(__dirname, 'quicklook-plugin', 'RawConverterQLPlugin.dll')
+
+  if (!fs.existsSync(srcDll)) return { ok: false, error: 'Plugin DLL not built yet — run quicklook-plugin/build.bat first' }
+
+  const pluginDir = path.join(process.env.APPDATA || '', 'QuickLook', 'Plugins', 'RawConverter')
+  try {
+    fs.mkdirSync(pluginDir, { recursive: true })
+    fs.copyFileSync(srcDll, path.join(pluginDir, 'RawConverterQLPlugin.dll'))
+    return { ok: true }
+  } catch (e) { return { ok: false, error: e.message } }
+})
+
 // ── Register / unregister PSD thumbnail handler from inside the app ─────────
 ipcMain.handle('register-thumbnail-handler', async (_, unregister = false) => {
   if (process.platform !== 'win32') return { ok: false, error: 'Windows only' }

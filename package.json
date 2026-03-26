@@ -46,6 +46,11 @@
       {
         "from": "thumbnail-handler/RawConverterThumb.dll",
         "to": "thumbnail-handler/RawConverterThumb.dll"
+      },
+      {
+        "from": "quicklook-plugin/RawConverterQLPlugin.dll",
+        "to": "quicklook-plugin/RawConverterQLPlugin.dll",
+        "filter": ["**/*.dll"]
       }
     ],
     "win": {

@@ -982,68 +982,90 @@ window.api.onWatcherFile?.(async ({ path: fp, size, folder }) => {
   }
 })
 
-/* ── Explorer integration (Windows thumbnail handler) ────────────────────── */
+/* ── Explorer integration (thumbnails + QuickLook plugin) ────────────────── */
 async function setupIntegrationSection() {
   if (window.api.platform !== 'win32') return
-  const section = $('integrationSection')
-  section.classList.remove('hidden')
+  $('integrationSection').classList.remove('hidden')
 
-  // Inject icons
-  $('icoThumbReg').innerHTML = I.externalLink
-
-  $('quicklookLink').addEventListener('click', () => {
-    window.open('ms-windows-store://pdp/?productid=9NVL5NL4NLLM')
-  })
-
-  // Check registration status via registry key existence
-  await refreshThumbStatus()
+  $('icoThumbReg').innerHTML   = I.externalLink
+  $('icoIntegThumb').innerHTML = I.image
+  $('icoIntegQL').innerHTML    = I.eye
+  $('icoQLInstall').innerHTML  = I.check
 
   $('thumbRegisterBtn').addEventListener('click', async () => {
-    const btn = $('thumbRegisterBtn')
+    const btn   = $('thumbRegisterBtn')
+    const label = $('thumbRegLabel')
     btn.disabled = true
-    btn.textContent = 'Waiting for UAC…'
+    label.textContent = 'Waiting for UAC…'
     try {
       const res = await window.api.registerThumbnailHandler?.()
       if (res?.ok) {
         localStorage.setItem('thumbHandlerRegistered', '1')
-        setStatus('Explorer thumbnails enabled for PSD/PSB ✓', 'ok')
-        await refreshThumbStatus()
+        setStatus('PSD/PSB Explorer thumbnails enabled ✓', 'ok')
       } else {
-        setStatus('Registration failed: ' + (res?.error || 'Unknown error'), 'err')
+        setStatus('Registration failed: ' + (res?.error || 'Unknown'), 'err')
       }
-    } catch (e) {
-      setStatus('Registration error: ' + e.message, 'err')
+    } catch (e) { setStatus('Registration error: ' + e.message, 'err') }
+    btn.disabled = false
+    label.textContent = 'Re-register'
+    refreshIntegrationStatus()
+  })
+
+  $('qlInstallBtn').addEventListener('click', async () => {
+    const btn   = $('qlInstallBtn')
+    const label = $('qlInstallLabel')
+    btn.disabled = true
+    label.textContent = 'Installing…'
+    const res = await window.api.installQuickLookPlugin?.()
+    if (res?.ok) {
+      localStorage.setItem('qlPluginInstalled', '1')
+      setStatus('QuickLook plugin installed — press Space on any RAW/PSD! ✓', 'ok')
+    } else {
+      setStatus('Plugin install failed: ' + (res?.error || 'Unknown'), 'err')
     }
     btn.disabled = false
-    btn.innerHTML = `<span id="icoThumbReg">${I.externalLink}</span> Enable Thumbnails`
+    label.textContent = 'Re-install'
+    refreshIntegrationStatus()
   })
+
+  $('qlGetBtn').addEventListener('click', () => {
+    window.open('ms-windows-store://pdp/?productid=9NVL5NL4NLLM')
+  })
+
+  refreshIntegrationStatus()
 }
 
-async function refreshThumbStatus() {
-  // Check if our CLSID is registered under .psd
+async function refreshIntegrationStatus() {
+  const thumbRegistered = localStorage.getItem('thumbHandlerRegistered') === '1'
+  const thumbBadge      = $('thumbStatusBadge')
+  const thumbLabel      = $('thumbRegLabel')
+  if (thumbBadge) {
+    thumbBadge.textContent = thumbRegistered ? '✓ Active' : 'Not enabled'
+    thumbBadge.className   = 'integ-status' + (thumbRegistered ? ' ok' : '')
+  }
+  if (thumbLabel) thumbLabel.textContent = thumbRegistered ? 'Re-register' : 'Enable Thumbnails'
+
   try {
-    const res = await window.api.checkRawCodec?.()
-    // We reuse checkRawCodec to also detect our own handler via registry
-    // For a simple proxy: just check if the DLL exists and assume registered if so
-  } catch {}
-  // Show status based on last known state in localStorage
-  const registered = localStorage.getItem('thumbHandlerRegistered') === '1'
-  const status = $('thumbStatus')
-  const btn    = $('thumbRegisterBtn')
-  if (status) {
-    status.textContent = registered ? '✓ Enabled' : 'Not enabled'
-    status.className   = 'thumb-status ' + (registered ? 'enabled' : 'disabled')
-  }
-  if (btn && registered) {
-    btn.innerHTML = `<span>${I.check}</span> Enabled`
-    btn.title     = 'Click to re-register if thumbnails stopped working'
-  }
-}
+    const ql        = await window.api.checkQuickLook?.()
+    const qlBadge   = $('qlStatusBadge')
+    const qlInstall = $('qlInstallBtn')
+    const qlGet     = $('qlGetBtn')
+    const pluginKnown = ql?.pluginInstalled || localStorage.getItem('qlPluginInstalled') === '1'
 
-// After successful registration persist state
-const _origRegister = window.api?.registerThumbnailHandler
-if (_origRegister) {
-  // Wrap to persist state — handled in the click handler above
+    if (!ql?.installed) {
+      if (qlBadge)   { qlBadge.textContent = 'QuickLook not installed'; qlBadge.className = 'integ-status' }
+      if (qlGet)     qlGet.style.display = ''
+      if (qlInstall) qlInstall.style.display = 'none'
+    } else if (!pluginKnown) {
+      if (qlBadge)   { qlBadge.textContent = 'Plugin not installed'; qlBadge.className = 'integ-status' }
+      if (qlInstall) qlInstall.style.display = ''
+      if (qlGet)     qlGet.style.display = 'none'
+    } else {
+      if (qlBadge)   { qlBadge.textContent = '✓ Active'; qlBadge.className = 'integ-status ok' }
+      if (qlInstall) { qlInstall.style.display = ''; $('qlInstallLabel').textContent = 'Re-install' }
+      if (qlGet)     qlGet.style.display = 'none'
+    }
+  } catch {}
 }
 
 /* ── Codec banner ────────────────────────────────────────────────────────── */

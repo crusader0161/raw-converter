@@ -272,18 +272,32 @@
   <div class="integration-section hidden" id="integrationSection">
     <div class="watch-header">
       <span class="sec-label">Explorer Integration</span>
-      <span class="watch-hint">PSD &amp; PSB thumbnails in Windows Explorer</span>
       <span class="spacer"></span>
-      <div class="thumb-status" id="thumbStatus"></div>
-      <button class="btn btn-ghost btn-sm" id="thumbRegisterBtn" title="Requires Administrator – a UAC prompt will appear">
-        <span id="icoThumbReg"></span> Enable Thumbnails
+      <button class="btn btn-ghost btn-sm" id="thumbRegisterBtn" title="Register PSD/PSB thumbnail provider (UAC prompt)">
+        <span id="icoThumbReg"></span> <span id="thumbRegLabel">Enable Thumbnails</span>
       </button>
     </div>
-    <div class="integration-note" id="integrationNote">
-      After enabling, PSD and PSB files will show real image thumbnails in Windows Explorer
-      (any folder, no extra software needed).
-      Press <kbd>Space</kbd> in Explorer with
-      <a class="ov-link" id="quicklookLink">QuickLook</a> installed for instant previews.
+    <div class="integration-rows" id="integrationRows">
+      <div class="integ-row">
+        <span class="integ-icon" id="icoIntegThumb"></span>
+        <div class="integ-text">
+          <span class="integ-title">PSD &amp; PSB Thumbnails</span>
+          <span class="integ-sub">Real image thumbnails in Windows Explorer — no extra software</span>
+        </div>
+        <span class="integ-status" id="thumbStatusBadge">Not enabled</span>
+      </div>
+      <div class="integ-row">
+        <span class="integ-icon" id="icoIntegQL"></span>
+        <div class="integ-text">
+          <span class="integ-title">Space-bar Quick Preview</span>
+          <span class="integ-sub">Press Space on any RAW/PSD/PSB file in Explorer for instant preview</span>
+        </div>
+        <span class="integ-status" id="qlStatusBadge">—</span>
+        <button class="btn btn-ghost btn-sm" id="qlInstallBtn" style="display:none">
+          <span id="icoQLInstall"></span> <span id="qlInstallLabel">Install plugin</span>
+        </button>
+        <button class="codec-get-btn" id="qlGetBtn" style="display:none">Get QuickLook free</button>
+      </div>
     </div>
   </div>
 

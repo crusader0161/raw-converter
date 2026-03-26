@@ -57,6 +57,10 @@ contextBridge.exposeInMainWorld('api', {
   registerThumbnailHandler:   ()  => ipcRenderer.invoke('register-thumbnail-handler', false),
   unregisterThumbnailHandler: ()  => ipcRenderer.invoke('register-thumbnail-handler', true),
 
+  // QuickLook plugin
+  checkQuickLook:          ()  => ipcRenderer.invoke('check-quicklook'),
+  installQuickLookPlugin:  ()  => ipcRenderer.invoke('install-quicklook-plugin'),
+
   // File open (from OS / second instance)
   onOpenFiles: (cb) => ipcRenderer.on('open-files', (_, files) => cb(files)),
 })
