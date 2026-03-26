@@ -34,9 +34,71 @@
   </div>
 </div>
 
+<!-- ── Viewer Overlay ── -->
+<div class="viewer hidden" id="viewer">
+  <div class="viewer-toolbar">
+    <div class="viewer-info" id="viewerInfo">
+      <span class="viewer-name" id="viewerName"></span>
+      <span class="viewer-dims" id="viewerDims"></span>
+    </div>
+    <div class="viewer-actions">
+      <button class="viewer-btn" id="viewerZoomOut" title="Zoom out (-)">
+        <span id="icoZoomOut"></span>
+      </button>
+      <span class="viewer-zoom-label" id="viewerZoomLabel">100%</span>
+      <button class="viewer-btn" id="viewerZoomIn" title="Zoom in (+)">
+        <span id="icoZoomIn"></span>
+      </button>
+      <button class="viewer-btn" id="viewerZoomFit" title="Fit to screen (F)">
+        <span id="icoZoomFit"></span>
+      </button>
+      <div class="viewer-sep"></div>
+      <button class="viewer-btn" id="viewerRevealBtn" title="Show in Explorer">
+        <span id="icoReveal"></span>
+      </button>
+      <button class="viewer-btn viewer-btn-close" id="viewerClose" title="Close (Esc)">
+        <span id="icoViewerClose"></span>
+      </button>
+    </div>
+  </div>
+  <button class="viewer-nav viewer-prev" id="viewerPrev" title="Previous (←)">
+    <span id="icoPrev"></span>
+  </button>
+  <div class="viewer-stage" id="viewerStage">
+    <img class="viewer-img" id="viewerImg" alt="">
+    <div class="viewer-loading" id="viewerLoading">
+      <div class="spinner"></div>
+    </div>
+  </div>
+  <button class="viewer-nav viewer-next" id="viewerNext" title="Next (→)">
+    <span id="icoNext"></span>
+  </button>
+  <div class="viewer-meta-bar" id="viewerMetaBar">
+    <span id="viewerMetaText"></span>
+    <span class="viewer-counter" id="viewerCounter"></span>
+  </div>
+</div>
+
+<!-- ── Context Menu ── -->
+<div class="ctx-menu hidden" id="ctxMenu">
+  <div class="ctx-item" id="ctxView">
+    <span id="icoCtxView"></span> View
+  </div>
+  <div class="ctx-item" id="ctxReveal">
+    <span id="icoCtxReveal"></span> Show in Explorer
+  </div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" id="ctxConvert">
+    <span id="icoCtxConvert"></span> Convert this file
+  </div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item ctx-item-danger" id="ctxRemove">
+    <span id="icoCtxRemove"></span> Remove from list
+  </div>
+</div>
+
 <!-- ── Titlebar ── -->
 <div class="titlebar" id="titlebar">
-  <!-- macOS: left traffic-light controls (hidden on Windows) -->
   <div class="wc-group wc-mac" id="wcMac">
     <button class="wc wc-close" id="btnClose"  title="Close"></button>
     <button class="wc wc-min"   id="btnMin"    title="Minimise"></button>
@@ -53,13 +115,22 @@
     <div class="ver-chip" id="verChip">dnglab</div>
     <div class="update-chip hidden" id="updateChip" title=""><span id="updateChipText"></span></div>
 
-    <!-- Windows: right-side controls (hidden on macOS) -->
     <div class="wc-group wc-win" id="wcWin">
       <button class="wc wc-min"   id="btnMinW"   title="Minimise"></button>
       <button class="wc wc-max"   id="btnMaxW"   title="Maximise"></button>
       <button class="wc wc-close" id="btnCloseW" title="Close"></button>
     </div>
   </div>
+</div>
+
+<!-- ── Codec Banner ── -->
+<div class="codec-banner hidden" id="codecBanner">
+  <span id="icoCodecBanner"></span>
+  <span>Install the <strong>Raw Image Extension</strong> from the Microsoft Store to enable Explorer thumbnails for RAW files.</span>
+  <button class="codec-get-btn" id="codecGetBtn">Get it free</button>
+  <button class="codec-close-btn" id="codecBannerClose" title="Dismiss">
+    <span id="icoCodecClose"></span>
+  </button>
 </div>
 
 <!-- ── Main ── -->
@@ -69,7 +140,7 @@
   <div class="drop-zone" id="dropZone">
     <div class="drop-icon-wrap" id="dropIcon"></div>
     <div class="drop-title">Drop images or folders here</div>
-    <div class="drop-sub">RAW · DNG · HEIC · PNG · TIFF · AVIF · WebP · PSD and more</div>
+    <div class="drop-sub">RAW · DNG · HEIC · PNG · TIFF · AVIF · WebP · PSD · PSB and more</div>
     <div class="drop-btns">
       <button class="btn btn-ghost btn-sm" id="addFilesBtn">
         <span id="icoFilePlus"></span> Add Files
@@ -86,6 +157,17 @@
       <span class="sec-label">Files</span>
       <span class="badge" id="fileBadge">0</span>
       <span class="spacer"></span>
+      <div class="view-toggle" id="viewToggle">
+        <button class="view-btn active" id="listViewBtn" title="List view">
+          <span id="icoList"></span>
+        </button>
+        <button class="view-btn" id="gridViewBtn" title="Grid view">
+          <span id="icoGrid"></span>
+        </button>
+      </div>
+      <button class="btn btn-ghost btn-sm icon-btn" id="clearDoneBtn" style="display:none" title="Clear completed">
+        <span id="icoClearDone"></span> Clear done
+      </button>
       <button class="btn btn-ghost btn-sm icon-btn" id="retryBtn" style="display:none" title="Retry failed">
         <span id="icoRetry"></span> Retry
       </button>
@@ -101,7 +183,7 @@
     </div>
   </div>
 
-  <!-- Settings: output + format -->
+  <!-- Settings panel -->
   <div class="settings">
 
     <div class="settings-row">
@@ -141,11 +223,55 @@
       </div>
     </div>
 
+    <div class="settings-divider"></div>
+
+    <div class="settings-row settings-row-narrow">
+      <div class="settings-title">Options</div>
+      <div class="options-grid">
+        <label class="check-row" title="Resize longest edge before converting">
+          <input type="checkbox" id="resizeEnabled">
+          <div class="check-box"><span id="icoCheckResize"></span></div>
+          <span class="radio-label">Resize max</span>
+          <input class="num-input" type="number" id="resizeMax" value="2048" min="100" max="99999">
+          <span class="quality-label">px</span>
+        </label>
+        <div class="collision-row">
+          <span class="quality-label">On conflict:</span>
+          <select class="select-input" id="collisionPolicy">
+            <option value="rename">Rename</option>
+            <option value="overwrite">Overwrite</option>
+            <option value="skip">Skip</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Watch folders section -->
+  <div class="watch-section" id="watchSection">
+    <div class="watch-header">
+      <span class="sec-label">Watch Folders</span>
+      <span class="watch-hint">Auto-add new files as they appear</span>
+      <span class="spacer"></span>
+      <label class="toggle-label" title="Auto-convert new files">
+        <input type="checkbox" id="autoConvertToggle">
+        <div class="toggle-track"><div class="toggle-thumb"></div></div>
+        <span class="radio-label">Auto-convert</span>
+      </label>
+      <button class="btn btn-ghost btn-sm" id="addWatchFolderBtn">
+        <span id="icoWatchAdd"></span> Add…
+      </button>
+    </div>
+    <div class="watch-list" id="watchList">
+      <div class="watch-empty" id="watchEmpty">No folders watched</div>
+    </div>
   </div>
 
   <!-- Bottom bar -->
   <div class="bottom-bar">
     <span class="status-line" id="statusLine"></span>
+    <span class="eta-line" id="etaLine"></span>
     <div class="progress-wrap" id="progWrap">
       <div class="progress-fill" id="progFill"></div>
     </div>

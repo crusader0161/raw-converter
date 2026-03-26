@@ -1,6 +1,6 @@
 {
   "name": "raw-converter",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "RAW to DNG/JPEG/PNG converter powered by dnglab",
   "main": "main.js",
   "scripts": {
@@ -15,6 +15,7 @@
   "license": "MIT",
   "dependencies": {
     "electron-updater": "^6.8.3",
+    "exif-reader": "^2.0.3",
     "sharp": "^0.33.5"
   },
   "devDependencies": {
@@ -82,6 +83,11 @@
         }
       ]
     },
+    "fileAssociations": [
+      { "ext": ["cr3","cr2","crw","nef","nrw","arw","srf","sr2","raf","rw2","orf","pef","srw","x3f","raw","3fr","mef","mrw","kdc","dcs","dcr","erf","iiq","mos","fff","rwl","r3d"], "name": "Camera RAW Image", "description": "Camera RAW Image", "role": "Viewer" },
+      { "ext": ["dng"], "name": "DNG Image", "description": "Digital Negative Image", "role": "Viewer" },
+      { "ext": ["heic","heif","avif","webp","tiff","tif","bmp","psd","psb"], "name": "Image File", "description": "Image File", "role": "Viewer" }
+    ],
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
