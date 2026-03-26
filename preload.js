@@ -53,6 +53,10 @@ contextBridge.exposeInMainWorld('api', {
   onUpdateStatus: (cb) => ipcRenderer.on('update-status', (_, data) => cb(data)),
   installUpdate:  ()   => ipcRenderer.invoke('install-update'),
 
+  // Thumbnail handler registration (Windows, requires UAC)
+  registerThumbnailHandler:   ()  => ipcRenderer.invoke('register-thumbnail-handler', false),
+  unregisterThumbnailHandler: ()  => ipcRenderer.invoke('register-thumbnail-handler', true),
+
   // File open (from OS / second instance)
   onOpenFiles: (cb) => ipcRenderer.on('open-files', (_, files) => cb(files)),
 })

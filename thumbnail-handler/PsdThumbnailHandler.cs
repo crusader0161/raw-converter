@@ -1,152 +1,230 @@
+// RawConverterThumb — Pure .NET 4.x COM thumbnail provider for PSD + PSB
+// No external dependencies — compiles with csc.exe from .NET Framework 4.x
+//
+// Compile:
+//   csc /target:library /platform:x64
+//       /reference:System.Drawing.dll
+//       /out:RawConverterThumb.dll
+//       PsdThumbnailHandler.cs
+//
+// Register (as Administrator):
+//   regasm /codebase RawConverterThumb.dll
+//
+// Unregister:
+//   regasm /unregister RawConverterThumb.dll
+
 using System;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
-using SharpShell.Attributes;
-using SharpShell.SharpThumbnailHandler;
+using Microsoft.Win32;
 
 namespace RawConverterThumb
 {
-    /// <summary>
-    /// Windows Explorer thumbnail provider for PSD and PSB files.
-    /// Extracts the embedded JPEG thumbnail from PSD Image Resource Block 0x0409.
-    ///
-    /// Registration (run as Administrator):
-    ///   regasm /codebase RawConverterThumb.dll
-    ///
-    /// Unregistration:
-    ///   regasm /unregister RawConverterThumb.dll
-    /// </summary>
-    [ComVisible(true)]
-    [COMServerAssociation(AssociationType.ClassOfExtension, ".psd")]
-    [COMServerAssociation(AssociationType.ClassOfExtension, ".psb")]
-    [Guid("A1B2C3D4-E5F6-7890-ABCD-EF1234567890")]   // replace with a real unique GUID via guidgen.exe
-    public class PsdThumbnailHandler : SharpThumbnailHandler
-    {
-        // ── PSD/PSB file structure constants ─────────────────────────────────
-        private const ushort RESOURCE_BLOCK_JPEG_THUMB = 0x0409;   // Adobe spec: JPEG thumbnail (all versions)
-        private const ushort RESOURCE_BLOCK_JPEG_THUMB_ALT = 0x040C; // Older Photoshop JPEG thumb (obsolete)
-        private const int    PSD_SIGNATURE = 0x38425053;            // "8BPS"
+    // ── COM interfaces required by Windows Shell ──────────────────────────────
 
-        protected override Bitmap GetThumbnailImage(uint width)
+    [ComImport, Guid("b7d14566-0509-4cce-a71f-0a554233bd9b"),
+     InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IInitializeWithFile
+    {
+        void Initialize([MarshalAs(UnmanagedType.LPWStr)] string pszFilePath, uint grfMode);
+    }
+
+    [ComImport, Guid("e357fccd-a995-4576-b01f-234630154e96"),
+     InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IThumbnailProvider
+    {
+        void GetThumbnail(uint cx, out IntPtr phbmp, out WTS_ALPHATYPE pdwAlpha);
+    }
+
+    public enum WTS_ALPHATYPE
+    {
+        WTSAT_UNKNOWN = 0,
+        WTSAT_RGB     = 1,
+        WTSAT_ARGB    = 2,
+    }
+
+    // ── COM server ────────────────────────────────────────────────────────────
+
+    [ComVisible(true)]
+    [ClassInterface(ClassInterfaceType.None)]
+    [Guid("3D5C2AB1-4E6F-4F9A-B2C3-1D4E5F6A7B8C")]   // fixed GUID for this handler
+    [ProgId("RawConverterThumb.PsdThumbnailHandler")]
+    public class PsdThumbnailHandler : IInitializeWithFile, IThumbnailProvider
+    {
+        private static readonly string ClsidStr  = "{3D5C2AB1-4E6F-4F9A-B2C3-1D4E5F6A7B8C}";
+        private static readonly string ThumbGuid = "{E357FCCD-A995-4576-B01F-234630154E96}";
+
+        private string _filePath;
+
+        // ── IInitializeWithFile ──────────────────────────────────────────────
+        public void Initialize(string pszFilePath, uint grfMode)
+        {
+            _filePath = pszFilePath;
+        }
+
+        // ── IThumbnailProvider ───────────────────────────────────────────────
+        public void GetThumbnail(uint cx, out IntPtr phbmp, out WTS_ALPHATYPE pdwAlpha)
+        {
+            phbmp    = IntPtr.Zero;
+            pdwAlpha = WTS_ALPHATYPE.WTSAT_UNKNOWN;
+
+            if (string.IsNullOrEmpty(_filePath)) return;
+
+            byte[] jpeg = ExtractPsdThumbnailJpeg(_filePath);
+            if (jpeg == null || jpeg.Length < 4) return;
+
+            try
+            {
+                using (var ms = new MemoryStream(jpeg))
+                using (var src = new Bitmap(ms))
+                {
+                    int longer = Math.Max(src.Width, src.Height);
+                    if (longer == 0) return;
+
+                    double scale = (double)cx / longer;
+                    int w = Math.Max(1, (int)(src.Width  * scale));
+                    int h = Math.Max(1, (int)(src.Height * scale));
+
+                    // Render into a new 32-bit ARGB bitmap
+                    var result = new Bitmap(w, h, PixelFormat.Format32bppRgb);
+                    result.SetResolution(96, 96);
+                    using (var g = Graphics.FromImage(result))
+                    {
+                        g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                        g.SmoothingMode     = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+                        g.DrawImage(src, 0, 0, w, h);
+                    }
+
+                    // GetHbitmap returns an HBITMAP; Explorer calls DeleteObject when done
+                    phbmp    = result.GetHbitmap();
+                    pdwAlpha = WTS_ALPHATYPE.WTSAT_RGB;
+                    // Do NOT dispose result — GetHbitmap keeps the handle alive
+                }
+            }
+            catch { /* return null thumbnail on any error */ }
+        }
+
+        // ── COM registration / unregistration ────────────────────────────────
+
+        [ComRegisterFunction]
+        public static void Register(Type t)
         {
             try
             {
-                byte[] jpegData = ExtractPsdThumbnailJpeg(SelectedItemStream);
-                if (jpegData == null || jpegData.Length < 4)
-                    return null;
-
-                using (var ms = new MemoryStream(jpegData))
+                // Associate the handler with .psd and .psb in HKCR
+                foreach (string ext in new[] { ".psd", ".psb" })
                 {
-                    var bmp = new Bitmap(ms);
-                    // Resize to requested thumbnail width while preserving aspect ratio
-                    double scale = (double)width / Math.Max(bmp.Width, bmp.Height);
-                    int w = Math.Max(1, (int)(bmp.Width  * scale));
-                    int h = Math.Max(1, (int)(bmp.Height * scale));
-                    return new Bitmap(bmp, new Size(w, h));
+                    using (var key = Registry.ClassesRoot.CreateSubKey(
+                        ext + @"\ShellEx\" + ThumbGuid, true))
+                        key.SetValue(null, ClsidStr);
                 }
+
+                // Mark as approved shell extension (required on some systems)
+                using (var key = Registry.LocalMachine.CreateSubKey(
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved", true))
+                    key.SetValue(ClsidStr, "RAW Converter PSD/PSB Thumbnail Provider");
             }
-            catch
-            {
-                return null;
-            }
+            catch { /* silently ignore if registry write fails */ }
         }
 
-        /// <summary>
-        /// Parses PSD Image Resource blocks and returns the JPEG bytes from
-        /// resource block 0x0409 (or legacy 0x040C).
-        /// </summary>
-        private static byte[] ExtractPsdThumbnailJpeg(Stream stream)
+        [ComUnregisterFunction]
+        public static void Unregister(Type t)
         {
-            if (stream == null) return null;
-            stream.Seek(0, SeekOrigin.Begin);
-
-            using (var br = new BinaryReader(stream, System.Text.Encoding.ASCII, leaveOpen: true))
+            try
             {
-                // ── File header ─────────────────────────────────────────────
-                uint sig = ReadUInt32BE(br);
-                if (sig != PSD_SIGNATURE) return null;   // not a PSD/PSB
+                foreach (string ext in new[] { ".psd", ".psb" })
+                    Registry.ClassesRoot.DeleteSubKeyTree(
+                        ext + @"\ShellEx\" + ThumbGuid, throwOnMissingSubKey: false);
 
-                ushort version = ReadUInt16BE(br);       // 1 = PSD, 2 = PSB
-                if (version != 1 && version != 2) return null;
+                using (var key = Registry.LocalMachine.OpenSubKey(
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved", true))
+                    if (key != null) key.DeleteValue(ClsidStr, throwOnMissingValue: false);
+            }
+            catch { }
+        }
 
-                br.BaseStream.Seek(6, SeekOrigin.Current); // 6 reserved bytes
+        // ── PSD Image Resource parsing ────────────────────────────────────────
+        // Reads resource block 0x0409 (JPEG thumbnail, all PSD/PSB versions).
 
-                ushort channels = ReadUInt16BE(br);
-                uint   height   = ReadUInt32BE(br);
-                uint   width2   = ReadUInt32BE(br);
-                ushort depth    = ReadUInt16BE(br);
-                ushort mode     = ReadUInt16BE(br);
-
-                // ── Color mode data ──────────────────────────────────────────
-                uint colorModeLen = ReadUInt32BE(br);
-                br.BaseStream.Seek(colorModeLen, SeekOrigin.Current);
-
-                // ── Image resources ──────────────────────────────────────────
-                uint resourcesLen = ReadUInt32BE(br);
-                long resourcesEnd = br.BaseStream.Position + resourcesLen;
-
-                while (br.BaseStream.Position + 10 < resourcesEnd)
+        private static byte[] ExtractPsdThumbnailJpeg(string path)
+        {
+            try
+            {
+                using (var fs = File.OpenRead(path))
+                using (var br = new BinaryReader(fs))
                 {
-                    // Each resource: "8BIM" (4) + ID (2) + pascal string (var) + data length (4) + data
-                    uint blockSig = ReadUInt32BE(br);
-                    if (blockSig != 0x3842494D)          // "8BIM"
-                        break;
+                    // File header
+                    if (ReadU32(br) != 0x38425053) return null;   // "8BPS"
+                    ushort ver = ReadU16(br);                       // 1=PSD, 2=PSB
+                    if (ver != 1 && ver != 2) return null;
 
-                    ushort resourceId = ReadUInt16BE(br);
+                    fs.Seek(6,  SeekOrigin.Current);  // 6 reserved bytes
+                    fs.Seek(2,  SeekOrigin.Current);  // channels
+                    fs.Seek(4,  SeekOrigin.Current);  // height
+                    fs.Seek(4,  SeekOrigin.Current);  // width
+                    fs.Seek(2,  SeekOrigin.Current);  // depth
+                    fs.Seek(2,  SeekOrigin.Current);  // color mode
 
-                    // Pascal string (padded to even length)
-                    byte nameLen = br.ReadByte();
-                    int  padded  = (nameLen % 2 == 0) ? nameLen + 1 : nameLen; // +1 for length byte itself
-                    if (padded > 0) br.BaseStream.Seek(padded, SeekOrigin.Current);
+                    // Color mode data section
+                    uint colorLen = ReadU32(br);
+                    fs.Seek(colorLen, SeekOrigin.Current);
 
-                    uint dataLen    = ReadUInt32BE(br);
-                    long dataStart  = br.BaseStream.Position;
-                    long dataEnd    = dataStart + dataLen + (dataLen % 2);     // padded to even
+                    // Image resources section
+                    uint resLen = ReadU32(br);
+                    long resEnd = fs.Position + resLen;
 
-                    if (resourceId == RESOURCE_BLOCK_JPEG_THUMB ||
-                        resourceId == RESOURCE_BLOCK_JPEG_THUMB_ALT)
+                    while (fs.Position + 12 < resEnd)
                     {
-                        // Thumbnail resource layout:
-                        //   format (4) + width (4) + height (4) + widthBytes (4) +
-                        //   totalSize (4) + compressedSize (4) + bpp (2) + planes (2) +
-                        //   JPEG data (compressedSize bytes)
-                        uint format         = ReadUInt32BE(br);  // 1 = JPEG
-                        uint thumbW         = ReadUInt32BE(br);
-                        uint thumbH         = ReadUInt32BE(br);
-                        uint widthBytes     = ReadUInt32BE(br);
-                        uint totalSize      = ReadUInt32BE(br);
-                        uint compressedSize = ReadUInt32BE(br);
-                        ushort bpp          = ReadUInt16BE(br);
-                        ushort planes       = ReadUInt16BE(br);
+                        uint blockSig = ReadU32(br);
+                        if (blockSig != 0x3842494D) break;   // "8BIM"
 
-                        if (format == 1 && compressedSize > 0)
+                        ushort resId  = ReadU16(br);
+
+                        // Pascal string (skip + pad to even length)
+                        byte nameLen = br.ReadByte();
+                        int  padBytes = (nameLen % 2 == 0) ? nameLen + 1 : nameLen;
+                        if (padBytes > 0) fs.Seek(padBytes, SeekOrigin.Current);
+
+                        uint dataLen = ReadU32(br);
+                        long dataEnd = fs.Position + dataLen + (dataLen % 2); // even-padded
+
+                        if (resId == 0x0409 || resId == 0x040C)
                         {
-                            byte[] jpeg = br.ReadBytes((int)compressedSize);
-                            return jpeg;
-                        }
-                    }
+                            // Thumbnail resource layout (Adobe spec):
+                            //   format        (4)  — 1 = JPEG
+                            //   width         (4)
+                            //   height        (4)
+                            //   widthBytes    (4)
+                            //   totalSize     (4)
+                            //   compressedSize(4)
+                            //   bpp           (2)
+                            //   planes        (2)
+                            //   JPEG data     (compressedSize bytes)
+                            uint fmt      = ReadU32(br);
+                            ReadU32(br); // thumbW
+                            ReadU32(br); // thumbH
+                            ReadU32(br); // widthBytes
+                            ReadU32(br); // totalSize
+                            uint cSize    = ReadU32(br);
+                            ReadU16(br); // bpp
+                            ReadU16(br); // planes
 
-                    // Skip to end of this resource (even-padded)
-                    br.BaseStream.Seek(dataEnd, SeekOrigin.Begin);
+                            if (fmt == 1 && cSize > 0)
+                                return br.ReadBytes((int)cSize);
+                        }
+
+                        fs.Seek(dataEnd, SeekOrigin.Begin);
+                    }
                 }
             }
+            catch { }
             return null;
         }
 
-        // ── Big-endian read helpers ───────────────────────────────────────────
-        private static uint ReadUInt32BE(BinaryReader br)
-        {
-            byte[] b = br.ReadBytes(4);
-            if (BitConverter.IsLittleEndian) Array.Reverse(b);
-            return BitConverter.ToUInt32(b, 0);
-        }
-
-        private static ushort ReadUInt16BE(BinaryReader br)
-        {
-            byte[] b = br.ReadBytes(2);
-            if (BitConverter.IsLittleEndian) Array.Reverse(b);
-            return BitConverter.ToUInt16(b, 0);
-        }
+        // Big-endian readers
+        private static uint   ReadU32(BinaryReader br) { var b = br.ReadBytes(4); Array.Reverse(b); return BitConverter.ToUInt32(b, 0); }
+        private static ushort ReadU16(BinaryReader br) { var b = br.ReadBytes(2); Array.Reverse(b); return BitConverter.ToUInt16(b, 0); }
     }
 }

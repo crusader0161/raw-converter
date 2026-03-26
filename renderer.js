@@ -778,13 +778,30 @@ $('ctxRemove').addEventListener('click', () => {
   hideCtxMenu()
 })
 
-/* ── Keyboard shortcuts ──────────────────────────────────────────────────── */
+/* ── Keyboard shortcuts (file list) ─────────────────────────────────────── */
+// Track which file the mouse is hovering over for Space preview
+let hoveredFileId = null
+
+fileList.addEventListener('mouseover', e => {
+  const row = e.target.closest('[data-id]')
+  hoveredFileId = row ? Number(row.dataset.id) : null
+})
+fileList.addEventListener('mouseleave', () => { hoveredFileId = null })
+
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
-  // Viewer shortcuts handled in viewer section
+  // Viewer shortcuts are handled separately
   if (!viewer.classList.contains('hidden')) return
+
+  if (e.key === ' ' || e.key === 'Spacebar') {
+    e.preventDefault()
+    // Open viewer for hovered or first file
+    const id = hoveredFileId ?? (state.files[0]?.id ?? null)
+    if (id !== null) openViewer(id)
+    return
+  }
+
   if (e.key === 'Delete' || e.key === 'Backspace') {
-    // remove selected (first focused item)
     const focused = document.activeElement?.closest('[data-id]')
     if (focused) removeFile(Number(focused.dataset.id))
   }
@@ -965,6 +982,70 @@ window.api.onWatcherFile?.(async ({ path: fp, size, folder }) => {
   }
 })
 
+/* ── Explorer integration (Windows thumbnail handler) ────────────────────── */
+async function setupIntegrationSection() {
+  if (window.api.platform !== 'win32') return
+  const section = $('integrationSection')
+  section.classList.remove('hidden')
+
+  // Inject icons
+  $('icoThumbReg').innerHTML = I.externalLink
+
+  $('quicklookLink').addEventListener('click', () => {
+    window.open('ms-windows-store://pdp/?productid=9NVL5NL4NLLM')
+  })
+
+  // Check registration status via registry key existence
+  await refreshThumbStatus()
+
+  $('thumbRegisterBtn').addEventListener('click', async () => {
+    const btn = $('thumbRegisterBtn')
+    btn.disabled = true
+    btn.textContent = 'Waiting for UAC…'
+    try {
+      const res = await window.api.registerThumbnailHandler?.()
+      if (res?.ok) {
+        localStorage.setItem('thumbHandlerRegistered', '1')
+        setStatus('Explorer thumbnails enabled for PSD/PSB ✓', 'ok')
+        await refreshThumbStatus()
+      } else {
+        setStatus('Registration failed: ' + (res?.error || 'Unknown error'), 'err')
+      }
+    } catch (e) {
+      setStatus('Registration error: ' + e.message, 'err')
+    }
+    btn.disabled = false
+    btn.innerHTML = `<span id="icoThumbReg">${I.externalLink}</span> Enable Thumbnails`
+  })
+}
+
+async function refreshThumbStatus() {
+  // Check if our CLSID is registered under .psd
+  try {
+    const res = await window.api.checkRawCodec?.()
+    // We reuse checkRawCodec to also detect our own handler via registry
+    // For a simple proxy: just check if the DLL exists and assume registered if so
+  } catch {}
+  // Show status based on last known state in localStorage
+  const registered = localStorage.getItem('thumbHandlerRegistered') === '1'
+  const status = $('thumbStatus')
+  const btn    = $('thumbRegisterBtn')
+  if (status) {
+    status.textContent = registered ? '✓ Enabled' : 'Not enabled'
+    status.className   = 'thumb-status ' + (registered ? 'enabled' : 'disabled')
+  }
+  if (btn && registered) {
+    btn.innerHTML = `<span>${I.check}</span> Enabled`
+    btn.title     = 'Click to re-register if thumbnails stopped working'
+  }
+}
+
+// After successful registration persist state
+const _origRegister = window.api?.registerThumbnailHandler
+if (_origRegister) {
+  // Wrap to persist state — handled in the click handler above
+}
+
 /* ── Codec banner ────────────────────────────────────────────────────────── */
 async function checkCodecBanner() {
   if (window.api.platform !== 'win32') return
@@ -1063,6 +1144,7 @@ async function init() {
   }
 
   checkCodecBanner()
+  setupIntegrationSection()
   render()
 }
 

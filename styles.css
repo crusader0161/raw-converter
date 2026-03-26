@@ -1269,6 +1269,40 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
 }
 .codec-close-btn:hover { color: var(--txt-2); }
 
+/* ── Integration section ── */
+.integration-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  flex-shrink: 0;
+}
+.integration-section.hidden { display: none; }
+
+.integration-note {
+  font-size: 11px;
+  color: var(--txt-3);
+  line-height: 1.6;
+  margin-top: 6px;
+}
+.integration-note kbd {
+  background: var(--surface-3);
+  border: 1px solid var(--border-2);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-family: inherit;
+  color: var(--txt-2);
+}
+
+.thumb-status {
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.thumb-status.enabled  { color: var(--ok); }
+.thumb-status.disabled { color: var(--txt-3); }
+
 /* ── ETA line ── */
 .eta-line {
   font-size: 11px;

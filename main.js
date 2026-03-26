@@ -489,3 +489,36 @@ ipcMain.handle('convert-file-to-image', async (_, { filePath, outputPath, format
 ipcMain.on('cancel-conversion', () => {
   if (activeProcess) { activeProcess.kill(); activeProcess = null }
 })
+
+// ── Register / unregister PSD thumbnail handler from inside the app ─────────
+ipcMain.handle('register-thumbnail-handler', async (_, unregister = false) => {
+  if (process.platform !== 'win32') return { ok: false, error: 'Windows only' }
+
+  // Locate the DLL (works in dev and packaged)
+  const dllPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'thumbnail-handler', 'RawConverterThumb.dll')
+    : path.join(__dirname, 'thumbnail-handler', 'RawConverterThumb.dll')
+
+  if (!fs.existsSync(dllPath)) return { ok: false, error: 'DLL not found at ' + dllPath }
+
+  const regasm = 'C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\RegAsm.exe'
+  if (!fs.existsSync(regasm)) return { ok: false, error: 'RegAsm.exe not found' }
+
+  const flag = unregister ? '/unregister' : '/codebase'
+
+  // Launch via PowerShell Start-Process -Verb RunAs to get UAC elevation
+  const psCmd = `Start-Process -FilePath '${regasm}' -ArgumentList '${flag}','${dllPath}' -Verb RunAs -Wait`
+
+  return new Promise(resolve => {
+    execFile('powershell.exe', ['-NoProfile', '-Command', psCmd],
+      { windowsHide: true, timeout: 30_000 },
+      (err) => {
+        if (err) resolve({ ok: false, error: err.message })
+        else {
+          // Notify shell to refresh thumbnail cache
+          execFile('ie4uinit.exe', ['-show'], { windowsHide: true }, () => {})
+          resolve({ ok: true })
+        }
+      })
+  })
+})

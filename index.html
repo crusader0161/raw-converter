@@ -268,6 +268,25 @@
     </div>
   </div>
 
+  <!-- Explorer Integration section (Windows only) -->
+  <div class="integration-section hidden" id="integrationSection">
+    <div class="watch-header">
+      <span class="sec-label">Explorer Integration</span>
+      <span class="watch-hint">PSD &amp; PSB thumbnails in Windows Explorer</span>
+      <span class="spacer"></span>
+      <div class="thumb-status" id="thumbStatus"></div>
+      <button class="btn btn-ghost btn-sm" id="thumbRegisterBtn" title="Requires Administrator – a UAC prompt will appear">
+        <span id="icoThumbReg"></span> Enable Thumbnails
+      </button>
+    </div>
+    <div class="integration-note" id="integrationNote">
+      After enabling, PSD and PSB files will show real image thumbnails in Windows Explorer
+      (any folder, no extra software needed).
+      Press <kbd>Space</kbd> in Explorer with
+      <a class="ov-link" id="quicklookLink">QuickLook</a> installed for instant previews.
+    </div>
+  </div>
+
   <!-- Bottom bar -->
   <div class="bottom-bar">
     <span class="status-line" id="statusLine"></span>

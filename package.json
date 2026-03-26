@@ -41,9 +41,11 @@
       {
         "from": "bin/",
         "to": "bin/",
-        "filter": [
-          "**/*"
-        ]
+        "filter": ["**/*"]
+      },
+      {
+        "from": "thumbnail-handler/RawConverterThumb.dll",
+        "to": "thumbnail-handler/RawConverterThumb.dll"
       }
     ],
     "win": {
@@ -93,7 +95,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "RAW Converter"
+      "shortcutName": "RAW Converter",
+      "include": "installer.nsh"
     },
     "publish": {
       "provider": "github",
