@@ -56,6 +56,7 @@ const state = {
   watchFolders: [],
   autoConvert:  false,
   notifications: true,
+  proMode:     false,
 }
 
 let nextId = 0
@@ -146,6 +147,7 @@ function saveSettings() {
       resizeMax:     state.resizeMax,
       watchFolders:  state.watchFolders,
       autoConvert:   state.autoConvert,
+      proMode:       state.proMode,
     }))
   } catch {}
 }
@@ -163,7 +165,17 @@ function loadSettings() {
     if (s.resizeMax)   { state.resizeMax = s.resizeMax }
     if (Array.isArray(s.watchFolders)) state.watchFolders = s.watchFolders
     if (typeof s.autoConvert === 'boolean') state.autoConvert = s.autoConvert
+    if (typeof s.proMode === 'boolean') state.proMode = s.proMode
   } catch {}
+}
+
+/* ── Basic / Pro mode ────────────────────────────────────────────────────── */
+function setProMode(enabled) {
+  state.proMode = enabled
+  document.body.classList.toggle('pro-mode', enabled)
+  const chip = $('proChip')
+  if (chip) chip.textContent = enabled ? 'PRO' : 'BASIC'
+  saveSettings()
 }
 
 /* ── Platform + Theme setup ──────────────────────────────────────────────── */
@@ -226,6 +238,7 @@ function injectStaticIcons() {
   $('icoZoomOut').innerHTML      = I.zoomOut
   $('icoZoomIn').innerHTML       = I.zoomIn
   $('icoZoomFit').innerHTML      = I.maximize2
+  $('icoViewerConvert').innerHTML = I.convert
   $('icoReveal').innerHTML       = I.externalLink
   $('icoViewerClose').innerHTML  = I.x
   $('icoPrev').innerHTML         = I.chevLeft
@@ -329,12 +342,20 @@ function statusHTML(f) {
   return ''
 }
 
+const RAW_EXTS = new Set(['cr3','cr2','crw','nef','nrw','arw','srf','sr2','raf','rw2','orf','pef','srw','x3f','raw','3fr','mef','mrw','kdc','k25','dcs','dcr','erf','iiq','mos','mfw','fff','rwl','rwz','ptx','r3d'])
+function extBadgeClass(name) {
+  const e = ext(name).toLowerCase()
+  if (e === 'dng') return 'dng'
+  if (RAW_EXTS.has(e)) return 'raw'
+  return 'std'
+}
+
 function makeRow(f) {
   const el = document.createElement('div')
   el.className  = 'file-item ' + f.status
   el.dataset.id = f.id
   el.innerHTML  = `
-    <div class="ext-badge">${esc(ext(f.name).toUpperCase() || '?')}</div>
+    <div class="ext-badge ${extBadgeClass(f.name)}">${esc(ext(f.name).toUpperCase() || '?')}</div>
     <div class="file-meta">
       <div class="file-name">${esc(f.name)}</div>
       <div class="file-dir">${esc(f.dir)}</div>
@@ -858,6 +879,23 @@ function loadViewerImage(idx) {
     $('viewerDims').textContent = 'Preview unavailable'
   })
 
+  // Load EXIF metadata asynchronously
+  $('viewerMetaSep').textContent = ''
+  $('viewerExif').textContent    = ''
+  window.api.getImageMetadata?.(f.path).then(m => {
+    if (!m) return
+    const parts = []
+    if (m.make || m.model) parts.push([m.make, m.model].filter(Boolean).join(' '))
+    if (m.iso)             parts.push('ISO ' + m.iso)
+    if (m.exposure)        parts.push(m.exposure + 's')
+    if (m.fNumber)         parts.push('f/' + m.fNumber)
+    if (m.focalLength)     parts.push(m.focalLength + 'mm')
+    if (parts.length) {
+      $('viewerMetaSep').textContent = '·'
+      $('viewerExif').textContent    = parts.join('  ')
+    }
+  }).catch(() => {})
+
   $('viewerPrev').style.opacity = idx === 0 ? '.3' : ''
   $('viewerNext').style.opacity = idx === state.files.length - 1 ? '.3' : ''
 }
@@ -884,6 +922,17 @@ $('viewerZoomFit').addEventListener('click', () => { viewerZoom = 1; viewerTrans
 $('viewerRevealBtn').addEventListener('click', () => {
   const f = state.files[viewerIdx]
   if (f) window.api.revealInExplorer?.(f.path)
+})
+
+$('viewerConvertBtn').addEventListener('click', () => {
+  const f = state.files[viewerIdx]
+  if (!f || state.converting) return
+  closeViewer()
+  // Move this file to the top of the list so it converts first
+  const idx = state.files.indexOf(f)
+  if (idx > 0) { state.files.splice(idx, 1); state.files.unshift(f) }
+  render()
+  startConversion()
 })
 
 // Drag to pan
@@ -1030,27 +1079,6 @@ async function setupIntegrationSection() {
     refreshIntegrationStatus()
   })
 
-  $('qlInstallBtn').addEventListener('click', async () => {
-    const btn   = $('qlInstallBtn')
-    const label = $('qlInstallLabel')
-    btn.disabled = true
-    label.textContent = 'Installing…'
-    const res = await window.api.installQuickLookPlugin?.()
-    if (res?.ok) {
-      localStorage.setItem('qlPluginInstalled', '1')
-      setStatus('QuickLook plugin installed — press Space on any RAW/PSD! ✓', 'ok')
-    } else {
-      setStatus('Plugin install failed: ' + (res?.error || 'Unknown'), 'err')
-    }
-    btn.disabled = false
-    label.textContent = 'Re-install'
-    refreshIntegrationStatus()
-  })
-
-  $('qlGetBtn').addEventListener('click', () => {
-    window.open('ms-windows-store://pdp/?productid=9NVL5NL4NLLM')
-  })
-
   $('rawCodecInstallBtn').addEventListener('click', async () => {
     const btn   = $('rawCodecInstallBtn')
     const label = $('rawInstallLabel')
@@ -1087,27 +1115,8 @@ async function refreshIntegrationStatus() {
   }
   if (thumbLabel) thumbLabel.textContent = thumbRegistered ? 'Re-register' : 'Enable Thumbnails'
 
-  // ── QuickLook ──
-  try {
-    const ql          = await window.api.checkQuickLook?.()
-    const qlBadge     = $('qlStatusBadge')
-    const qlInstall   = $('qlInstallBtn')
-    const qlGet       = $('qlGetBtn')
-    const pluginKnown = ql?.pluginInstalled || localStorage.getItem('qlPluginInstalled') === '1'
-    if (!ql?.installed) {
-      if (qlBadge)   { qlBadge.textContent = 'Not installed'; qlBadge.className = 'integ-status' }
-      if (qlGet)     qlGet.style.display = ''
-      if (qlInstall) qlInstall.style.display = 'none'
-    } else if (!pluginKnown) {
-      if (qlBadge)   { qlBadge.textContent = 'Plugin missing'; qlBadge.className = 'integ-status' }
-      if (qlInstall) qlInstall.style.display = ''
-      if (qlGet)     qlGet.style.display = 'none'
-    } else {
-      if (qlBadge)   { qlBadge.textContent = '✓ Active'; qlBadge.className = 'integ-status ok' }
-      if (qlInstall) { qlInstall.style.display = ''; $('qlInstallLabel').textContent = 'Re-install' }
-      if (qlGet)     qlGet.style.display = 'none'
-    }
-  } catch {}
+  // ── Built-in Preview row — always Active (file associations handle it) ──
+  // badge is static in HTML; no dynamic logic needed
 
   // ── RAW Image Extension ──
   try {
@@ -1177,10 +1186,35 @@ $('updateChip').addEventListener('click', () => {
   if ($('updateChip').classList.contains('ready')) window.api.installUpdate?.()
 })
 
-/* ── File open from OS ───────────────────────────────────────────────────── */
+/* ── File open from OS (drag-drop/picker, adds to queue) ─────────────────── */
 window.api.onOpenFiles?.(async files => {
   await addPaths(files)
 })
+
+/* ── Open for preview (file-association double-click from Explorer) ───────── */
+window.api.onOpenForPreview?.(async files => {
+  const before = state.files.length
+  await addPaths(files)
+  render()
+  // Open the first newly-added file in the viewer
+  const newFiles = state.files.slice(before)
+  if (newFiles.length > 0) openViewer(newFiles[0].id)
+})
+
+/* ── Silent RAW codec auto-install (first launch only) ───────────────────── */
+async function silentlyEnsureRawCodec() {
+  if (window.api.platform !== 'win32') return
+  if (localStorage.getItem('rawCodecAutoInstalled')) return
+  try {
+    const res = await window.api.checkRawCodec?.()
+    if (res?.available) { localStorage.setItem('rawCodecAutoInstalled', '1'); return }
+    setStatus('Setting up RAW thumbnail support…')
+    const install = await window.api.installRawCodec?.()
+    localStorage.setItem('rawCodecAutoInstalled', '1')
+    if (install?.ok) setStatus('RAW thumbnails enabled in Explorer ✓', 'ok')
+    else setStatus('')
+  } catch { localStorage.setItem('rawCodecAutoInstalled', '1') }
+}
 
 /* ── Init ────────────────────────────────────────────────────────────────── */
 async function init() {
@@ -1190,10 +1224,21 @@ async function init() {
   injectStaticIcons()
   applySavedSettings()
 
+  // Apply saved Pro/Basic mode
+  setProMode(state.proMode)
+
+  // Wire Pro chip toggle
+  $('proChip')?.addEventListener('click', () => setProMode(!state.proMode))
+
   window.api.onUpdateStatus?.(handleUpdateStatus)
 
+  // Show app version in titlebar chip; dnglab version as tooltip
+  window.api.getAppVersion?.().then(v => {
+    if (v) verChip.textContent = 'v' + v
+  })
+
   const info = await window.api.checkDnglab()
-  if (info.available) verChip.textContent = info.version || 'dnglab'
+  if (info.available) verChip.title = info.version ? ('dnglab ' + info.version) : 'dnglab'
   else overlay.classList.remove('hidden')
 
   // Restore watch folders from saved state
@@ -1203,6 +1248,7 @@ async function init() {
 
   setupSectionToggle('watchToggle', 'watchSection', 'watchCollapsed')
   setupIntegrationSection()
+  silentlyEnsureRawCodec()
   render()
 }
 

@@ -46,6 +46,9 @@ contextBridge.exposeInMainWorld('api', {
   unwatchAll:    ()  => ipcRenderer.invoke('unwatch-all'),
   onWatcherFile: (cb) => ipcRenderer.on('watcher-file', (_, data) => cb(data)),
 
+  // App info
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+
   // Codec check + install
   checkRawCodec:   () => ipcRenderer.invoke('check-raw-codec'),
   installRawCodec: () => ipcRenderer.invoke('install-raw-codec'),
@@ -63,5 +66,6 @@ contextBridge.exposeInMainWorld('api', {
   installQuickLookPlugin:  ()  => ipcRenderer.invoke('install-quicklook-plugin'),
 
   // File open (from OS / second instance)
-  onOpenFiles: (cb) => ipcRenderer.on('open-files', (_, files) => cb(files)),
+  onOpenFiles:      (cb) => ipcRenderer.on('open-files', (_, files) => cb(files)),
+  onOpenForPreview: (cb) => ipcRenderer.on('open-for-preview', (_, files) => cb(files)),
 })

@@ -53,6 +53,9 @@
         <span id="icoZoomFit"></span>
       </button>
       <div class="viewer-sep"></div>
+      <button class="viewer-btn" id="viewerConvertBtn" title="Convert this file">
+        <span id="icoViewerConvert"></span>
+      </button>
       <button class="viewer-btn" id="viewerRevealBtn" title="Show in Explorer">
         <span id="icoReveal"></span>
       </button>
@@ -75,6 +78,8 @@
   </button>
   <div class="viewer-meta-bar" id="viewerMetaBar">
     <span id="viewerMetaText"></span>
+    <span class="viewer-meta-sep" id="viewerMetaSep"></span>
+    <span class="viewer-exif" id="viewerExif"></span>
     <span class="viewer-counter" id="viewerCounter"></span>
   </div>
 </div>
@@ -112,7 +117,8 @@
 
   <div class="titlebar-end">
     <button class="theme-btn" id="themeBtn" title="Toggle theme"></button>
-    <div class="ver-chip" id="verChip">dnglab</div>
+    <button class="pro-chip" id="proChip" title="Toggle Basic / Pro mode">BASIC</button>
+    <div class="ver-chip" id="verChip">v1.2</div>
     <div class="update-chip hidden" id="updateChip" title=""><span id="updateChipText"></span></div>
 
     <div class="wc-group wc-win" id="wcWin">
@@ -289,14 +295,10 @@
         <div class="integ-row">
           <span class="integ-icon" id="icoIntegQL"></span>
           <div class="integ-text">
-            <span class="integ-title">Space-bar Quick Preview</span>
-            <span class="integ-sub">Press Space on any RAW/PSD/PSB file in Explorer for instant preview</span>
+            <span class="integ-title">Built-in Preview</span>
+            <span class="integ-sub">Double-click any RAW, DNG, PSD or PSB file to preview it in this app</span>
           </div>
-          <span class="integ-status" id="qlStatusBadge">—</span>
-          <button class="btn btn-ghost btn-sm" id="qlInstallBtn" style="display:none">
-            <span id="icoQLInstall"></span> <span id="qlInstallLabel">Install plugin</span>
-          </button>
-          <button class="codec-get-btn" id="qlGetBtn" style="display:none">Get QuickLook free</button>
+          <span class="integ-status ok" id="qlStatusBadge">✓ Active</span>
         </div>
         <div class="integ-row">
           <span class="integ-icon" id="icoIntegRaw"></span>

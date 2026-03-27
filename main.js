@@ -78,7 +78,7 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow.show()
     if (pendingOpenFiles.length) {
-      mainWindow.webContents.send('open-files', pendingOpenFiles)
+      mainWindow.webContents.send('open-for-preview', pendingOpenFiles)
       pendingOpenFiles = []
     }
   })
@@ -92,10 +92,9 @@ app.on('second-instance', (_, argv) => {
     if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.focus()
   }
-  // argv may contain file paths (electron passes them after the exe path)
   const files = argv.slice(process.defaultApp ? 2 : 1).filter(a => !a.startsWith('-') && fs.existsSync(a))
   if (files.length) {
-    if (mainWindow?.webContents) mainWindow.webContents.send('open-files', files)
+    if (mainWindow?.webContents) mainWindow.webContents.send('open-for-preview', files)
     else pendingOpenFiles.push(...files)
   }
 })
@@ -103,12 +102,11 @@ app.on('second-instance', (_, argv) => {
 // macOS open-file event
 app.on('open-file', (event, filePath) => {
   event.preventDefault()
-  if (mainWindow?.webContents) mainWindow.webContents.send('open-files', [filePath])
+  if (mainWindow?.webContents) mainWindow.webContents.send('open-for-preview', [filePath])
   else pendingOpenFiles.push(filePath)
 })
 
 app.whenReady().then(() => {
-  // Handle file open from CLI args
   const args = process.argv.slice(process.defaultApp ? 2 : 1)
   pendingOpenFiles = args.filter(a => !a.startsWith('-') && fs.existsSync(a))
   createWindow()
@@ -411,6 +409,9 @@ ipcMain.handle('check-raw-codec', async () => {
     })
   })
 })
+
+// ── App version ──────────────────────────────────────────────────────────────
+ipcMain.handle('get-app-version', () => app.getVersion())
 
 // ── Install RAW Image Extension via winget ────────────────────────────────────
 ipcMain.handle('install-raw-codec', async () => {

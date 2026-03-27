@@ -1,6 +1,6 @@
 {
   "name": "raw-converter",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "RAW to DNG/JPEG/PNG converter powered by dnglab",
   "main": "main.js",
   "scripts": {
