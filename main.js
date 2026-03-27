@@ -412,6 +412,24 @@ ipcMain.handle('check-raw-codec', async () => {
   })
 })
 
+// ── Install RAW Image Extension via winget ────────────────────────────────────
+ipcMain.handle('install-raw-codec', async () => {
+  if (process.platform !== 'win32') return { ok: false, error: 'Windows only' }
+  return new Promise(resolve => {
+    execFile('winget', [
+      'install', '--id', 'Microsoft.RawImageExtension', '-e',
+      '--accept-package-agreements', '--accept-source-agreements',
+    ], { windowsHide: true, timeout: 120_000 }, (err, stdout, stderr) => {
+      const out = ((stdout || '') + (stderr || '')).toLowerCase()
+      if (!err || out.includes('successfully installed') || out.includes('already installed') || out.includes('no available upgrade')) {
+        resolve({ ok: true })
+      } else {
+        resolve({ ok: false, error: 'winget failed — opening Store instead' })
+      }
+    })
+  })
+})
+
 // ── Collision policy helper ───────────────────────────────────────────────────
 function resolveOutFile(outFile, policy) {
   if (!fs.existsSync(outFile)) return outFile
@@ -549,19 +567,26 @@ ipcMain.handle('register-thumbnail-handler', async (_, unregister = false) => {
 
   const flag = unregister ? '/unregister' : '/codebase'
 
-  // Launch via PowerShell Start-Process -Verb RunAs to get UAC elevation
-  const psCmd = `Start-Process -FilePath '${regasm}' -ArgumentList '${flag}','${dllPath}' -Verb RunAs -Wait`
+  // Build a single-line PS script: RegAsm (elevated) + network policy + cache clear
+  const psCmd = [
+    `Start-Process -FilePath '${regasm}' -ArgumentList '${flag}','${dllPath}' -Verb RunAs -Wait`,
+    // Allow thumbnail handlers on network shares (HKCU, no elevation needed)
+    `$pp='HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer'`,
+    `if(-not(Test-Path $pp)){New-Item $pp -Force|Out-Null}`,
+    `Set-ItemProperty $pp -Name DisableThumbnailsOnNetworkFolders -Value 0 -Type DWord`,
+    // Clear stale thumbnail cache so Explorer regenerates
+    `Remove-Item "$env:LOCALAPPDATA\\Microsoft\\Windows\\Explorer\\thumbcache_*.db" -Force -EA SilentlyContinue`,
+    `Stop-Process -Name explorer -Force -EA SilentlyContinue`,
+    `Start-Sleep 1`,
+    `Start-Process explorer.exe`,
+  ].join('; ')
 
   return new Promise(resolve => {
     execFile('powershell.exe', ['-NoProfile', '-Command', psCmd],
       { windowsHide: true, timeout: 30_000 },
       (err) => {
         if (err) resolve({ ok: false, error: err.message })
-        else {
-          // Notify shell to refresh thumbnail cache
-          execFile('ie4uinit.exe', ['-show'], { windowsHide: true }, () => {})
-          resolve({ ok: true })
-        }
+        else resolve({ ok: true })
       })
   })
 })

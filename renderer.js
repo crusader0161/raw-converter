@@ -32,6 +32,8 @@ const I = {
   maximize2:   `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`,
   chevLeft:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>`,
   chevRight:   `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`,
+  chevDown:    `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`,
+  download:    `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
   folderWatch: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="3"/><circle cx="12" cy="13" r="1" fill="currentColor"/></svg>`,
   bell:        `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`,
   convert:     `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>`,
@@ -233,8 +235,6 @@ function injectStaticIcons() {
   $('icoCtxConvert').innerHTML   = I.convert
   $('icoCtxRemove').innerHTML    = I.trash
   $('icoWatchAdd').innerHTML     = I.folderWatch
-  $('icoCodecBanner').innerHTML  = I.bell
-  $('icoCodecClose').innerHTML   = I.x
   $('icoCheckResize').innerHTML  = I.checkSm
   $('titleIcon').innerHTML       = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`
 }
@@ -983,6 +983,21 @@ window.api.onWatcherFile?.(async ({ path: fp, size, folder }) => {
 })
 
 /* ── Explorer integration (thumbnails + QuickLook plugin) ────────────────── */
+/* ── Section collapse helpers ─────────────────────────────────────────────── */
+function setupSectionToggle(toggleId, sectionId, storageKey) {
+  const section  = $(sectionId)
+  const chevronEl = $(toggleId)
+  if (!section || !chevronEl) return
+  chevronEl.innerHTML = I.chevDown
+  // Restore saved collapse state
+  if (localStorage.getItem(storageKey) === '1') section.classList.add('sec-collapsed')
+  section.querySelector('.watch-header').addEventListener('click', e => {
+    if (e.target.closest('.btn, input, label, select, .toggle-label')) return
+    section.classList.toggle('sec-collapsed')
+    localStorage.setItem(storageKey, section.classList.contains('sec-collapsed') ? '1' : '0')
+  })
+}
+
 async function setupIntegrationSection() {
   if (window.api.platform !== 'win32') return
   $('integrationSection').classList.remove('hidden')
@@ -991,6 +1006,10 @@ async function setupIntegrationSection() {
   $('icoIntegThumb').innerHTML = I.image
   $('icoIntegQL').innerHTML    = I.eye
   $('icoQLInstall').innerHTML  = I.check
+  $('icoIntegRaw').innerHTML   = I.image
+  $('icoRawInstall').innerHTML = I.download
+
+  setupSectionToggle('integToggle', 'integrationSection', 'integCollapsed')
 
   $('thumbRegisterBtn').addEventListener('click', async () => {
     const btn   = $('thumbRegisterBtn')
@@ -1001,7 +1020,7 @@ async function setupIntegrationSection() {
       const res = await window.api.registerThumbnailHandler?.()
       if (res?.ok) {
         localStorage.setItem('thumbHandlerRegistered', '1')
-        setStatus('PSD/PSB Explorer thumbnails enabled ✓', 'ok')
+        setStatus('PSD/PSB Explorer thumbnails enabled — Explorer restarted ✓', 'ok')
       } else {
         setStatus('Registration failed: ' + (res?.error || 'Unknown'), 'err')
       }
@@ -1032,32 +1051,55 @@ async function setupIntegrationSection() {
     window.open('ms-windows-store://pdp/?productid=9NVL5NL4NLLM')
   })
 
+  $('rawCodecInstallBtn').addEventListener('click', async () => {
+    const btn   = $('rawCodecInstallBtn')
+    const label = $('rawInstallLabel')
+    btn.disabled = true
+    label.textContent = 'Installing…'
+    setStatus('Installing Raw Image Extension via winget…', 'ok')
+    try {
+      const res = await window.api.installRawCodec?.()
+      if (res?.ok) {
+        localStorage.setItem('rawCodecInstalled', '1')
+        setStatus('Raw Image Extension installed ✓ — RAW thumbnails now active in Explorer', 'ok')
+      } else {
+        // winget failed — open Store as fallback
+        window.open('ms-windows-store://pdp/?productid=9NCTDW2W1BH8')
+        setStatus('Opening Microsoft Store — install Raw Image Extension there', 'ok')
+      }
+    } catch { window.open('ms-windows-store://pdp/?productid=9NCTDW2W1BH8') }
+    btn.disabled = false
+    label.textContent = 'Re-install'
+    refreshIntegrationStatus()
+  })
+
   refreshIntegrationStatus()
 }
 
 async function refreshIntegrationStatus() {
+  // ── PSD/PSB thumbnails ──
   const thumbRegistered = localStorage.getItem('thumbHandlerRegistered') === '1'
-  const thumbBadge      = $('thumbStatusBadge')
-  const thumbLabel      = $('thumbRegLabel')
+  const thumbBadge = $('thumbStatusBadge')
+  const thumbLabel = $('thumbRegLabel')
   if (thumbBadge) {
     thumbBadge.textContent = thumbRegistered ? '✓ Active' : 'Not enabled'
     thumbBadge.className   = 'integ-status' + (thumbRegistered ? ' ok' : '')
   }
   if (thumbLabel) thumbLabel.textContent = thumbRegistered ? 'Re-register' : 'Enable Thumbnails'
 
+  // ── QuickLook ──
   try {
-    const ql        = await window.api.checkQuickLook?.()
-    const qlBadge   = $('qlStatusBadge')
-    const qlInstall = $('qlInstallBtn')
-    const qlGet     = $('qlGetBtn')
+    const ql          = await window.api.checkQuickLook?.()
+    const qlBadge     = $('qlStatusBadge')
+    const qlInstall   = $('qlInstallBtn')
+    const qlGet       = $('qlGetBtn')
     const pluginKnown = ql?.pluginInstalled || localStorage.getItem('qlPluginInstalled') === '1'
-
     if (!ql?.installed) {
-      if (qlBadge)   { qlBadge.textContent = 'QuickLook not installed'; qlBadge.className = 'integ-status' }
+      if (qlBadge)   { qlBadge.textContent = 'Not installed'; qlBadge.className = 'integ-status' }
       if (qlGet)     qlGet.style.display = ''
       if (qlInstall) qlInstall.style.display = 'none'
     } else if (!pluginKnown) {
-      if (qlBadge)   { qlBadge.textContent = 'Plugin not installed'; qlBadge.className = 'integ-status' }
+      if (qlBadge)   { qlBadge.textContent = 'Plugin missing'; qlBadge.className = 'integ-status' }
       if (qlInstall) qlInstall.style.display = ''
       if (qlGet)     qlGet.style.display = 'none'
     } else {
@@ -1066,29 +1108,23 @@ async function refreshIntegrationStatus() {
       if (qlGet)     qlGet.style.display = 'none'
     }
   } catch {}
-}
 
-/* ── Codec banner ────────────────────────────────────────────────────────── */
-async function checkCodecBanner() {
-  if (window.api.platform !== 'win32') return
-  if (localStorage.getItem('codecBannerDismissed')) return
+  // ── RAW Image Extension ──
   try {
-    const res = await window.api.checkRawCodec?.()
-    if (res && !res.available) {
-      $('codecBanner').classList.remove('hidden')
+    const raw        = await window.api.checkRawCodec?.()
+    const rawBadge   = $('rawCodecStatus')
+    const rawInstall = $('rawCodecInstallBtn')
+    const knownInstalled = localStorage.getItem('rawCodecInstalled') === '1'
+    if (raw?.available || knownInstalled) {
+      if (rawBadge)   { rawBadge.textContent = '✓ Active'; rawBadge.className = 'integ-status ok' }
+      if (rawInstall) rawInstall.style.display = 'none'
+    } else {
+      if (rawBadge)   { rawBadge.textContent = 'Not installed'; rawBadge.className = 'integ-status' }
+      if (rawInstall) rawInstall.style.display = ''
     }
   } catch {}
 }
 
-$('codecGetBtn').addEventListener('click', () => {
-  // Open MS Store link via shell (works in packaged Electron)
-  const url = 'ms-windows-store://pdp/?productid=9NCTDW2W1BH8'
-  window.open(url)
-})
-$('codecBannerClose').addEventListener('click', () => {
-  $('codecBanner').classList.add('hidden')
-  localStorage.setItem('codecBannerDismissed', '1')
-})
 
 /* ── Setup overlay ───────────────────────────────────────────────────────── */
 $('ovBrowseBtn').addEventListener('click', async () => {
@@ -1165,7 +1201,7 @@ async function init() {
     window.api.watchFolder?.(fp).catch(() => {})
   }
 
-  checkCodecBanner()
+  setupSectionToggle('watchToggle', 'watchSection', 'watchCollapsed')
   setupIntegrationSection()
   render()
 }

@@ -46,8 +46,9 @@ contextBridge.exposeInMainWorld('api', {
   unwatchAll:    ()  => ipcRenderer.invoke('unwatch-all'),
   onWatcherFile: (cb) => ipcRenderer.on('watcher-file', (_, data) => cb(data)),
 
-  // Codec check
-  checkRawCodec: () => ipcRenderer.invoke('check-raw-codec'),
+  // Codec check + install
+  checkRawCodec:   () => ipcRenderer.invoke('check-raw-codec'),
+  installRawCodec: () => ipcRenderer.invoke('install-raw-codec'),
 
   // Auto-updater
   onUpdateStatus: (cb) => ipcRenderer.on('update-status', (_, data) => cb(data)),

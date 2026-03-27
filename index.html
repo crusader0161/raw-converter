@@ -123,15 +123,6 @@
   </div>
 </div>
 
-<!-- ── Codec Banner ── -->
-<div class="codec-banner hidden" id="codecBanner">
-  <span id="icoCodecBanner"></span>
-  <span>Install the <strong>Raw Image Extension</strong> from the Microsoft Store to enable Explorer thumbnails for RAW files.</span>
-  <button class="codec-get-btn" id="codecGetBtn">Get it free</button>
-  <button class="codec-close-btn" id="codecBannerClose" title="Dismiss">
-    <span id="icoCodecClose"></span>
-  </button>
-</div>
 
 <!-- ── Main ── -->
 <div class="content">
@@ -249,8 +240,11 @@
   </div>
 
   <!-- Watch folders section -->
-  <div class="watch-section" id="watchSection">
+  <div class="watch-section sec-collapsed" id="watchSection">
     <div class="watch-header">
+      <button class="sec-chevron" id="watchToggle" title="Expand/collapse">
+        <span id="icoWatchChevron"></span>
+      </button>
       <span class="sec-label">Watch Folders</span>
       <span class="watch-hint">Auto-add new files as they appear</span>
       <span class="spacer"></span>
@@ -263,40 +257,58 @@
         <span id="icoWatchAdd"></span> Add…
       </button>
     </div>
-    <div class="watch-list" id="watchList">
-      <div class="watch-empty" id="watchEmpty">No folders watched</div>
+    <div class="sec-body" id="watchBody">
+      <div class="watch-list" id="watchList">
+        <div class="watch-empty" id="watchEmpty">No folders watched</div>
+      </div>
     </div>
   </div>
 
   <!-- Explorer Integration section (Windows only) -->
   <div class="integration-section hidden" id="integrationSection">
     <div class="watch-header">
+      <button class="sec-chevron" id="integToggle" title="Expand/collapse">
+        <span id="icoIntegChevron"></span>
+      </button>
       <span class="sec-label">Explorer Integration</span>
       <span class="spacer"></span>
       <button class="btn btn-ghost btn-sm" id="thumbRegisterBtn" title="Register PSD/PSB thumbnail provider (UAC prompt)">
         <span id="icoThumbReg"></span> <span id="thumbRegLabel">Enable Thumbnails</span>
       </button>
     </div>
-    <div class="integration-rows" id="integrationRows">
-      <div class="integ-row">
-        <span class="integ-icon" id="icoIntegThumb"></span>
-        <div class="integ-text">
-          <span class="integ-title">PSD &amp; PSB Thumbnails</span>
-          <span class="integ-sub">Real image thumbnails in Windows Explorer — no extra software</span>
+    <div class="sec-body" id="integBody">
+      <div class="integration-rows" id="integrationRows">
+        <div class="integ-row">
+          <span class="integ-icon" id="icoIntegThumb"></span>
+          <div class="integ-text">
+            <span class="integ-title">PSD &amp; PSB Thumbnails</span>
+            <span class="integ-sub">Real image thumbnails in Windows Explorer — no extra software</span>
+          </div>
+          <span class="integ-status" id="thumbStatusBadge">Not enabled</span>
         </div>
-        <span class="integ-status" id="thumbStatusBadge">Not enabled</span>
-      </div>
-      <div class="integ-row">
-        <span class="integ-icon" id="icoIntegQL"></span>
-        <div class="integ-text">
-          <span class="integ-title">Space-bar Quick Preview</span>
-          <span class="integ-sub">Press Space on any RAW/PSD/PSB file in Explorer for instant preview</span>
+        <div class="integ-row">
+          <span class="integ-icon" id="icoIntegQL"></span>
+          <div class="integ-text">
+            <span class="integ-title">Space-bar Quick Preview</span>
+            <span class="integ-sub">Press Space on any RAW/PSD/PSB file in Explorer for instant preview</span>
+          </div>
+          <span class="integ-status" id="qlStatusBadge">—</span>
+          <button class="btn btn-ghost btn-sm" id="qlInstallBtn" style="display:none">
+            <span id="icoQLInstall"></span> <span id="qlInstallLabel">Install plugin</span>
+          </button>
+          <button class="codec-get-btn" id="qlGetBtn" style="display:none">Get QuickLook free</button>
         </div>
-        <span class="integ-status" id="qlStatusBadge">—</span>
-        <button class="btn btn-ghost btn-sm" id="qlInstallBtn" style="display:none">
-          <span id="icoQLInstall"></span> <span id="qlInstallLabel">Install plugin</span>
-        </button>
-        <button class="codec-get-btn" id="qlGetBtn" style="display:none">Get QuickLook free</button>
+        <div class="integ-row">
+          <span class="integ-icon" id="icoIntegRaw"></span>
+          <div class="integ-text">
+            <span class="integ-title">RAW Thumbnails in Explorer</span>
+            <span class="integ-sub">CR2, NEF, ARW, RAF and all RAW formats — via Microsoft Raw Image Extension</span>
+          </div>
+          <span class="integ-status" id="rawCodecStatus">Checking…</span>
+          <button class="btn btn-ghost btn-sm" id="rawCodecInstallBtn" style="display:none">
+            <span id="icoRawInstall"></span> <span id="rawInstallLabel">Install free</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
