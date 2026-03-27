@@ -23,7 +23,7 @@ namespace RawConverterQLPlugin
     public class RawViewer : IViewer
     {
         // Lower number = higher priority (0 = checked first)
-        public int Priority => 0;
+        public int Priority { get { return 0; } }
 
         // File extensions we handle
         private static readonly HashSet<string> Exts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -124,22 +124,23 @@ namespace RawConverterQLPlugin
             return ExtractLargestJpegFromBinary(path);
         }
 
+        private struct JpegBlob { public int Start; public int End; }
+
         // Scan any binary file for embedded JPEG (works for all RAW/DNG formats)
         private static byte[] ExtractLargestJpegFromBinary(string path)
         {
             try
             {
                 byte[] data = File.ReadAllBytes(path);
-                var blobs = new System.Collections.Generic.List<(int start, int end)>();
+                var blobs = new System.Collections.Generic.List<JpegBlob>();
 
                 for (int i = 0; i < data.Length - 3; i++)
                 {
                     if (data[i] != 0xFF || data[i + 1] != 0xD8 || data[i + 2] != 0xFF)
                         continue;
 
-                    // Found SOI — search forward for EOI
-                    int j = data.Length - 2;
-                    // Search backward from next SOI (or EOF) for EOI
+                    // Found SOI — search backward from next SOI (or EOF) for EOI
+                    int j;
                     int limit = data.Length;
                     for (int k = i + 1; k < data.Length - 3; k++)
                     {
@@ -149,19 +150,23 @@ namespace RawConverterQLPlugin
                     for (j = Math.Min(limit, data.Length) - 2; j > i + 1000; j--)
                     {
                         if (data[j] == 0xFF && data[j + 1] == 0xD9)
-                        { blobs.Add((i, j + 2)); break; }
+                        {
+                            var blob = new JpegBlob(); blob.Start = i; blob.End = j + 2;
+                            blobs.Add(blob);
+                            break;
+                        }
                     }
                 }
 
                 if (blobs.Count == 0) return null;
-                var best = blobs[0];
-                foreach (var b in blobs)
-                    if ((b.end - b.start) > (best.end - best.start)) best = b;
+                JpegBlob best = blobs[0];
+                foreach (JpegBlob b in blobs)
+                    if ((b.End - b.Start) > (best.End - best.Start)) best = b;
 
-                if ((best.end - best.start) < 2000) return null;
+                if ((best.End - best.Start) < 2000) return null;
 
-                var result = new byte[best.end - best.start];
-                Array.Copy(data, best.start, result, 0, result.Length);
+                var result = new byte[best.End - best.Start];
+                Array.Copy(data, best.Start, result, 0, result.Length);
                 return result;
             }
             catch { return null; }
